@@ -61,7 +61,7 @@ section
     display:block;
     box-sizing: content-box;
     margin: 5% auto;
-    height: 100px;
+    max-height: 500px;
     max-width: 50%;
     font-size: 10cqw;
     border-color: #6C584C;
