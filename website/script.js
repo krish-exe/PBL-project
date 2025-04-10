@@ -158,7 +158,7 @@ function SendData()
     }
     else if(!document.getElementById(`${id0}moist_lvl_${id1}`).checked)
     {
-        update(p,{lvl:"-1"});
+        update(p,{lvl:-1});
     }
 
     if(!document.getElementById(`${id0}once${id1}`).checked)
