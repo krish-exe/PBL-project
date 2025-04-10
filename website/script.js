@@ -97,6 +97,7 @@ function EnableMoist()
         
         
         document.getElementById(`${document.activeElement.id.slice(0,1)}moist_lvl_${document.activeElement.id.slice(-1)}`).setAttribute("disabled","true");
+        
     }
 }
 
@@ -154,6 +155,10 @@ function SendData()
     {
         console.log(document.getElementById(`${id0}moist_lvl_${id1}`).value);
         update(p,{lvl:document.getElementById(`${id0}moist_lvl_${id1}`).value});
+    }
+    else if(!document.getElementById(`${id0}moist_lvl_${id1}`).checked)
+    {
+        update(p,{lvl:"-1"});
     }
 
     if(!document.getElementById(`${id0}once${id1}`).checked)
