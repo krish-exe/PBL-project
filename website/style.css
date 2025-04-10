@@ -31,7 +31,13 @@ h1
 
 section
 {
-     text-align: center;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
 }
 
 .banner
@@ -45,30 +51,54 @@ section
 
 .plant
 {
-    display: inline-block;
+    display: flex;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: stretch;
     background-color: #94a468;
     border-style: solid;
     border-color: #6C584C;
-    width: 500px;
-    margin: auto;
-    margin-right: 10px;
     text-align: left;
+    
 }
 
+.water_time
+{
+    border-style: solid;
+    border-width: 0px 0px 10px 0px;
+    border-color: #42492e;
+    background-color:#7d8b58;
+    text-align: left;
+    margin-bottom: 20px;
+}
 
-.add_plant, .add_schedule
+.check
+{
+    
+    margin:20px 0px 0px 0px;
+    width:50px;
+    text-align: left;
+    
+}
+
+.buttonDiv
+{
+    width: 100%;
+}
+
+.add_plant, .add_schedule,.add_time
 {
     display:block;
     box-sizing: content-box;
     margin: 5% auto;
     max-height: 500px;
-    max-width: 50%;
-    font-size: 10cqw;
+    max-width: 100%;
+    font-size: 8cqw;
     border-color: #6C584C;
     border-style:solid;
     border-width: 5px;
     border-radius: 10px;
-    padding: 0 25px;
+    padding: 0 45px;
     color: #F0EAD2;
     background-color: #A98467;
     text-align:center;
@@ -77,7 +107,7 @@ section
    
 }
 
-.add_plant:hover,.add_schedule:hover
+.add_plant:hover,.add_schedule:hover,.add_time:hover
 {
     background-color: #F0EAD2;
     color: #A98467;
@@ -93,12 +123,13 @@ h2{
     font-size: 50px;
 }
 
-.schedule,.water_cycle
+.schedule
 {
     border-style: solid;
     border-color: #6C584C;
     border-left: 0px;
     border-right: 0px;
+    
 }
 .add_schedule
 {
@@ -106,25 +137,39 @@ h2{
     height: 40px;
 }
 
-h3,h4
+h3
 {
     font-size: 40px;
     background-color: rgba(0, 0, 0, 0.475);
+    margin: 0px;
+}
+h4
+{
+    font-size: 30px;
     margin-top: 0px;
+    margin-bottom: 5px;
+    padding-left: 0px;
+    
+}
+h4 input.check
+{
+    height: 30px;
 }
 
 label
 {
     margin-top: 10px;
+    margin-bottom: 10px;
     font-size: 30px;
     
-    padding-left: 20px;
+    
 }
 
 input
 {
     margin-top: 10px;
-    width: 100px;
+    margin-bottom: 10px;
+    max-width: 24%;
     height: 40px;
     font-size: 30px;
     background-color: rgba(0, 0, 0, 0.375);
