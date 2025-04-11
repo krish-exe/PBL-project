@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
+#include "time.h"
 //Provide the token generation process info.
-#include "addons/TokenHelper.h"
+//#include "addons/TokenHelper.h"
 //Provide the RTDB payload printing info and other helper functions.
-#include "addons/RTDBHelper.h"
+//#include "addons/RTDBHelper.h"
 
 #define WIFI_SSID "oneplusnord2"
 #define WIFI_PASSWORD "7710990201"
@@ -20,11 +21,18 @@ FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
+const long gmtOffset_sec = 19800;  // IST = UTC +5:30 = 5*3600 + 30*60
+const int daylightOffset_sec = 0;
+const char* ntpServer = "pool.ntp.org";
+
 unsigned long sendDataPrevMillis = 0;
 bool signupOK = false;
 volatile bool updated = false;
 volatile int wait = 0;
-int led=2;
+int p1=12;
+int p2=13;
+int s1=34;
+int s2=35;
 int waterAmt;
 
 
@@ -35,7 +43,7 @@ void streamCallback(FirebaseStream data)
                 data.dataPath().c_str(),
                 data.dataType().c_str(),
                 data.eventType().c_str());
-  printResult(data); // see addons/RTDBHelper.h
+  //printResult(data); // see addons/RTDBHelper.h
   Serial.println();
 
   // This is the size of stream payload received (current and max value)
@@ -62,7 +70,9 @@ void setup()
 {
 
   Serial.begin(115200);
-  pinMode(led,OUTPUT);
+  pinMode(p1,OUTPUT);
+  pinMode(p2,OUTPUT);
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED)
@@ -81,6 +91,8 @@ void setup()
   /* Assign the RTDB URL (required) */
   config.database_url = DATABASE_URL;
 
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
   /* Sign up */
   if (Firebase.signUp(&config, &auth, "", ""))
   {
@@ -93,14 +105,14 @@ void setup()
   }
 
   /* Assign the callback function for the long running token generation task */
-  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+  //config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
   
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
   stream.keepAlive(5, 5, 1);
 
-   if (!Firebase.RTDB.beginStream(&stream, "/plant"))
+   if (!Firebase.RTDB.beginStream(&stream, "/"))
     Serial.printf("stream begin error, %s\n\n", stream.errorReason().c_str());
 
   Firebase.RTDB.setStreamCallback(&stream, streamCallback, streamTimeoutCallback);
@@ -132,49 +144,272 @@ void setup()
   */
 }
 
+struct tm timeinfo;
+char timeStr[9];
+int currentDay;
+
+int amts1[10], lvls1[10],len1;
+bool dayS1[10][7];
+String dayType1[10],hs1[10], ms1[10];
+
+int amts2[10], lvls2[10],len2;
+bool dayS2[10][7];
+String dayType2[10], hs2[10], ms2[10];
+
+
 void loop()
 {
   
+ /* if (Firebase.RTDB.getJSON(&fbdo, "/plant1")) 
+  {
+      FirebaseJson &plant = fbdo.jsonObject();
+      Serial.println(plant.get(1,));
+      
+
+  }
+  else 
+  {
+    Serial.println(fbdo.errorReason());
+  }*/
+  
+  const int dryValue1 = 3600;  // sensor1 value in dry soil
+const int wetValue1 = 1500;  // sensor1 value in water
+
+const int dryValue2 = 3600;  // sensor2 value in dry soil
+const int wetValue2 = 1500;  // sensor2 value in water
+
+int raw1 = analogRead(s1);
+int raw2 = analogRead(s2);
+
+int moisture1 = map(raw1, dryValue1, wetValue1, 0, 100);
+moisture1 = constrain(moisture1, 0, 100);
+
+int moisture2 = map(raw2, dryValue2, wetValue2, 0, 100);
+moisture2 = constrain(moisture2, 0, 100);
+  
+  if (getLocalTime(&timeinfo)) 
+  {
+    currentDay = timeinfo.tm_wday;
+    sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    Serial.println(timeStr);
+  } 
+  else 
+  {
+    Serial.println("Failed to get time");
+  }
  
   if(updated)
   {
+    Serial.print("update");
     updated=false;
-    if(Firebase.RTDB.getString(&fbdo,"plant/delay"))
-    {
-      wait = fbdo.stringData().toInt();
-    }
-    else
-    {
-      Serial.println(fbdo.errorReason());
-    }
-
-    if(Firebase.RTDB.getString(&fbdo,"plant/amt"))
-    {
-      waterAmt = fbdo.stringData().toInt();
-      if(wait==0)
-      {
-        
-        Serial.println(waterAmt);
-        digitalWrite(led,HIGH);
-        delay(waterAmt*1000);
-        digitalWrite(led,LOW);
-      }
-      
-    }
-    else
-    {
-      Serial.println(fbdo.errorReason());
-    }
-  }
-
-  if(wait>0)
+      int n=1;
+  while(Firebase.RTDB.getJSON(&fbdo, "/plant1/"+String(n)))
   {
-    Serial.println(wait);
-    digitalWrite(led,HIGH);
-    delay(waterAmt*1000);
-    digitalWrite(led,LOW);
-    delay(wait*1000);
+    FirebaseJson plant = fbdo.jsonObject();
+    FirebaseJsonData result;
+
+    plant.get(result,"/amt");
+    String amt = result.type;
+    amts1[n-1] = result.stringValue.toInt();
+
+    plant.get(result, "/h");
+    String h = result.stringValue;
+    hs1[n-1] = result.stringValue;
+
+    plant.get(result,"/m");
+    String m = result.stringValue;
+    ms1[n-1] = result.stringValue;
+
+    plant.get(result,"/lvl");
+    String lvl = result.stringValue;
+    lvls1[n-1] = result.stringValue.toInt();
+
+    plant.get(result,"/days");
+    dayType1[n-1] = result.type;
+    plant.get(result, "days");
+if (result.type == "array") {
+  FirebaseJsonArray arr;
+  result.get(arr);  // extract array from result
+
+  for (int i = 0; i < arr.size(); i++) {
+    FirebaseJsonData val;
+    arr.get(val, i);
+    dayS1[n - 1][i] = val.boolValue; // assuming array contains booleans
+    Serial.println(val.boolValue);   // print each value
   }
+}
+    
+    n++;
+
+
+  }
+  len1=n;
+  int m = 1;
+   // --- Plant 2 ---
+while (Firebase.RTDB.getJSON(&fbdo, "/plant2/" + String(m))) {
+  FirebaseJson plant = fbdo.jsonObject();
+  FirebaseJsonData result;
+
+  plant.get(result, "/amt");
+  String amt = result.type;
+  amts2[m - 1] = result.stringValue.toInt();
+
+  plant.get(result, "/h");
+  String h = result.stringValue;
+  hs2[m - 1] = result.stringValue;
+
+  plant.get(result, "/m");
+  String min = result.stringValue;
+  ms2[m - 1] = result.stringValue;
+
+  plant.get(result, "/lvl");
+  String lvl = result.stringValue;
+  lvls2[m - 1] = result.stringValue.toInt();
+
+  plant.get(result, "/days");
+  dayType2[m - 1] = result.type;
+  plant.get(result, "days");
+  if (result.type == "array") {
+    FirebaseJsonArray arr;
+    result.get(arr);
+
+    for (int i = 0; i < arr.size(); i++) {
+      FirebaseJsonData val;
+      arr.get(val, i);
+      dayS2[m - 1][i] = val.boolValue;
+      Serial.println(val.boolValue);
+    }
+  }
+
+  m++;
+}
+
+  len2=m;
+    
+  }
+
+  
+    for(int i=0; i<len1;i++)
+    {
+      if(dayType1[i] != "string")
+      {  
+        for(int j=0;j<7;j++)
+        {
+          
+          if(dayS1[i][j]==1 && currentDay==j)
+          {
+            Serial.println("day check1");
+            Serial.println((String(hs1[i])+":"+String(ms1[i])+"--"+timeStr));
+
+            if(hs1[i]+":"+ms1[i]==timeStr)
+            {
+              if(lvls1[i]!=-1)
+              {
+                Serial.println("time check2");
+                if(lvls1[i]>=moisture1)
+                {
+                  digitalWrite(p1,HIGH);
+                  delay(amts1[i]*67);
+                  digitalWrite(p1,LOW);
+                }
+              }
+              else
+              {
+                  digitalWrite(p1,HIGH);
+                  delay(amts1[i]*67);
+                  digitalWrite(p1,LOW);
+              }
+            }
+            
+          }
+        }
+      }
+      else
+      {
+        if(hs1[i]+":"+ms1[i]==timeStr)
+        {
+          if(lvls1[i]!=-1)
+          {
+            if(lvls1[i]>=moisture1)
+            digitalWrite(p1,HIGH);
+                  delay(amts1[i]*67);
+                  digitalWrite(p1,LOW);
+          }
+          else
+          {
+           digitalWrite(p1,HIGH);
+                  delay(amts1[i]*67);
+                  digitalWrite(p1,LOW);
+          }
+          
+        }
+      }
+    }
+    
+    for(int i=0; i<len2;i++)
+    {
+      if(dayType2[i] != "string")
+      {  
+        for(int j=0;j<7;j++)
+        {
+          
+          if(dayS2[i][j]==1 && currentDay==j)
+          {
+            Serial.println("day check2");
+            Serial.println((String(hs2[i])+":"+String(ms2[i])+"--"+timeStr));
+
+            if(hs2[i]+":"+ms2[i]==timeStr)
+            {
+              if(lvls2[i]!=-1)
+              {
+                if(lvls2[i]>=moisture2)
+                {
+                  digitalWrite(p2,HIGH);
+                  delay(amts2[i]*67);
+                  digitalWrite(p2,LOW);
+                }
+              }
+              else
+              {
+               
+                  digitalWrite(p2,HIGH);
+                  delay(amts2[i]*67);
+                  digitalWrite(p2,LOW);
+              }
+            }
+            
+          }
+        }
+      }
+      else
+      {
+        if(hs2[i]+":"+ms2[i]==timeStr)
+        {
+          if(lvls2[i]!=-1)
+          {
+            if(lvls2[i]>=moisture2)
+            {
+              
+                  digitalWrite(p2,HIGH);
+                  delay(amts2[i]*67);
+                  digitalWrite(p2,LOW);
+            }
+            Serial.println("time check2");
+          }
+
+          else
+          {
+            
+                  digitalWrite(p2,HIGH);
+                  delay(amts2[i]*67);
+                  digitalWrite(p2,LOW);
+          }
+              
+        }
+      }
+    }
+
+  
 
    if (!stream.httpConnected())
   {
@@ -196,4 +431,35 @@ void loop()
   {
     Serial.println(fbdo.errorReason());
   }*/
+}
+
+
+void printAllPlantData() {
+  Serial.println("--- Plant 1 Data ---");
+  for (int i = 0; i < len1; i++) {
+    Serial.print("Plant1 #"); Serial.println(i + 1);
+    Serial.print("Amt: "); Serial.println(amts1[i]);
+    Serial.print("H: "); Serial.println(hs1[i]);
+    Serial.print("M: "); Serial.println(ms1[i]);
+    Serial.print("Lvl: "); Serial.println(lvls1[i]);
+    Serial.print("Days: ");
+    for (int j = 0; j < 7; j++) {
+      Serial.print(dayS1[i][j]); Serial.print(" ");
+    }
+    Serial.println("\n");
+  }
+
+  Serial.println("--- Plant 2 Data ---");
+  for (int i = 0; i < len2; i++) {
+    Serial.print("Plant2 #"); Serial.println(i + 1);
+    Serial.print("Amt: "); Serial.println(amts2[i]);
+    Serial.print("H: "); Serial.println(hs2[i]);
+    Serial.print("M: "); Serial.println(ms2[i]);
+    Serial.print("Lvl: "); Serial.println(lvls2[i]);
+    Serial.print("Days: ");
+    for (int j = 0; j < 7; j++) {
+      Serial.print(dayS2[i][j]); Serial.print(" ");
+    }
+    Serial.println("\n");
+  }
 }
